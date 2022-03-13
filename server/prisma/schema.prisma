@@ -1,0 +1,85 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  createdAt    DateTime      @default(now())
+  username     String        @unique @db.VarChar(32)
+  private      Boolean       @default(false)
+  posts        Post[]
+  following    Follow[]      @relation("Following")
+  followers    Follow[]      @relation("Followers")
+  postLikes    PostLike[]
+  comments     Comment[]
+  commentLikes CommentLike[]
+  replies      Reply[]
+}
+
+model Follow {
+  id             Int       @id @default(autoincrement())
+  followedDate   DateTime  @default(now())
+  unfollowedDate DateTime?
+  user           User      @relation("Followers", fields: [userId], references: [id])
+  userId         Int
+  follower       User      @relation("Following", fields: [followerId], references: [id])
+  followerId     Int
+}
+
+model Post {
+  id        Int        @id @default(autoincrement())
+  createdAt DateTime   @default(now())
+  content   String     @db.Text
+  author    User       @relation(fields: [authorId], references: [id])
+  authorId  Int
+  likes     PostLike[]
+  comments  Comment[]
+}
+
+model Comment {
+  id        Int           @id @default(autoincrement())
+  createdAt DateTime      @default(now())
+  content   String        @db.Text
+  author    User          @relation(fields: [authorId], references: [id])
+  authorId  Int
+  post      Post          @relation(fields: [postId], references: [id])
+  postId    Int
+  likes     CommentLike[]
+  replies   Reply[]
+}
+
+model Reply {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  content   String   @db.Text
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  commentId Int
+}
+
+model PostLike {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+  postId    Int
+}
+
+model CommentLike {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  commentId Int
+}
