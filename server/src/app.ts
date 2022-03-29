@@ -1,100 +1,54 @@
 import { PrismaClient } from "@prisma/client";
+import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
+import { ApolloServer } from "apollo-server-express";
+import "class-validator";
 import cors from "cors";
 import express from "express";
-
-const prisma = new PrismaClient();
-const app = express();
+import session from "express-session";
+import "reflect-metadata";
+import { buildSchema } from "type-graphql";
+import FollowResolver from "./graphql/resolvers/FollowResolver";
+import ProfileResolver from "./graphql/resolvers/ProfileResolver";
+import UserResolver from "./graphql/resolvers/UserResolver";
+import { MyContext } from "./types";
 
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
-app.use(express.json());
+async function main() {
+  const prisma = new PrismaClient();
 
-app.get("/users", async (req, res) => {
-  const users = await prisma.user.findMany();
-  res.json(users);
-});
+  const app = express();
 
-app.get("/user", async (req, res) => {
-  const { id, username } = req.query;
-  if (!id && !username) {
-    return res.status(400).json({ error: "Missing id or username." });
-  }
+  app.use(cors({ origin: "http://localhost:3000", credentials: true }));
 
-  if (id) {
-    if (typeof id !== "string") {
-      return res.status(400).json({ error: "Id must be a string." });
-    } else if (!parseInt(id)) {
-      return res.status(400).json({ error: "Id must be a number string." });
-    }
-  }
+  app.use(
+    session({
+      name: "qid",
+      cookie: {
+        maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+        httpOnly: true,
+        sameSite: "lax",
+      },
+      secret: "qjlkrxcha.crgpalouchsmb'k'vwqmjbkshn",
+      resave: false,
+      saveUninitialized: false,
+    })
+  );
 
-  if (username) {
-    if (typeof username !== "string") {
-      return res.status(400).json({ error: "Username must be a string." });
-    }
-  }
-
-  const user = await prisma.user.findFirst({
-    where: {
-      id: id ? parseInt(id) : undefined,
-      username: { equals: username, mode: "insensitive" },
-    },
-
-    include: {
-      posts: true,
-      following: true,
-      followers: true,
-    },
+  const apolloServer = new ApolloServer({
+    schema: await buildSchema({
+      resolvers: [UserResolver, ProfileResolver, FollowResolver],
+    }),
+    context: ({ req, res }): MyContext => ({ req, res, prisma }),
+    plugins: [ApolloServerPluginLandingPageGraphQLPlayground],
   });
-  res.json(user);
-});
+  await apolloServer.start();
 
-app.post("/user", async (req, res) => {
-  const { username } = req.body;
-  if (!username) {
-    return res.status(400).send("Username is required");
-  } else if (typeof username !== "string") {
-    return res.status(400).send("Username must be a string");
-  }
+  apolloServer.applyMiddleware({ app, cors: false });
 
-  const user = await prisma.user.create({
-    data: { username },
+  app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}/graphql`);
   });
-  res.json(user);
-});
+}
 
-app.get("/posts", async (req, res) => {
-  const posts = await prisma.post.findMany();
-  res.json(posts);
-});
-
-app.post("/post", async (req, res) => {
-  const { username, content } = req.body;
-
-  if (!content) {
-    return res.status(400).send("Content is required");
-  } else if (typeof content !== "string") {
-    return res.status(400).send("Content must be a string");
-  }
-
-  const user = await prisma.user.findFirst({
-    where: { username },
-  });
-
-  if (!user) {
-    return res.status(404).send("User not found");
-  }
-
-  const post = await prisma.post.create({
-    data: {
-      content,
-      author: { connect: { id: user.id } },
-    },
-  });
-  res.json(post);
-});
-
-app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-});
+main();
