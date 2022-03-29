@@ -1,0 +1,11 @@
+mutation FollowUser($userId: ID!) {
+  followUser(userId: $userId) {
+    id
+  }
+}
+
+mutation UnfollowUser($userId: ID!) {
+  unfollowUser(userId: $userId) {
+    id
+  }
+}
